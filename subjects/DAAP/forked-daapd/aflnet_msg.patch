@@ -1,0 +1,74 @@
+diff --git a/afl-fuzz.c b/afl-fuzz.c
+index 8023451..21588c2 100644
+--- a/afl-fuzz.c
++++ b/afl-fuzz.c
+@@ -370,6 +370,8 @@ u32 state_ids_count = 0;
+ u32 selected_state_index = 0;
+ u32 state_cycles = 0;
+ u32 messages_sent = 0;
++u64 messages_sent_total = 0, last_messages_sent_total = 0;
++double avg_msg_sent;
+ EXP_ST u8 session_virgin_bits[MAP_SIZE];     /* Regions yet untouched while the SUT is still running */
+ EXP_ST u8 *cleanup_script; /* script to clean up the environment of the SUT -- make fuzzing more deterministic */
+ char **was_fuzzed_map = NULL; /* A 2D array keeping state-specific was_fuzzed information */
+@@ -3284,6 +3286,7 @@ static u8 run_target(char** argv, u32 timeout) {
+   setitimer(ITIMER_REAL, &it, NULL);
+ 
+   total_execs++;
++  messages_sent_total+=messages_sent;
+ 
+   /* Any subsequent operations on trace_bits must not be moved by the
+      compiler below this point. Past this location, trace_bits[] behave
+@@ -4304,7 +4307,9 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
+              "afl_version       : " VERSION "\n"
+              "target_mode       : %s%s%s%s%s%s%s\n"
+              "command_line      : %s\n"
+-             "slowest_exec_ms   : %llu\n",
++             "slowest_exec_ms   : %llu\n"
++             "msgs_per_sec      : %0.02f\n"
++             "total_msg_sent    : %lld\n",
+              start_time / 1000, get_cur_time() / 1000, getpid(),
+              queue_cycle ? (queue_cycle - 1) : 0, total_execs, eps,
+              queued_paths, queued_favored, queued_discovered, queued_imported,
+@@ -4318,7 +4323,7 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
+              persistent_mode ? "persistent " : "", deferred_mode ? "deferred " : "",
+              (qemu_mode || dumb_mode || no_forkserver || crash_mode ||
+               persistent_mode || deferred_mode) ? "" : "default",
+-             orig_cmdline, slowest_exec_ms);
++             orig_cmdline, slowest_exec_ms,(messages_sent_total*1000.0)/(get_cur_time()-start_time),messages_sent_total);
+              /* ignore errors */
+ 
+   /* Get rss value from the children
+@@ -4369,10 +4374,10 @@ static void maybe_update_plot_file(double bitmap_cvg, double eps) {
+      execs_per_sec */
+ 
+   fprintf(plot_file,
+-          "%llu, %llu, %u, %u, %u, %u, %0.02f%%, %llu, %llu, %u, %0.02f\n",
++          "%llu, %llu, %u, %u, %u, %u, %0.02f%%, %llu, %llu, %u, %0.02f, %0.02f\n",
+           get_cur_time() / 1000, queue_cycle - 1, current_entry, queued_paths,
+           pending_not_fuzzed, pending_favored, bitmap_cvg, unique_crashes,
+-          unique_hangs, max_depth, eps); /* ignore errors */
++          unique_hangs, max_depth, eps, avg_msg_sent); /* ignore errors */
+ 
+   fflush(plot_file);
+ 
+@@ -4822,6 +4827,9 @@ static void show_stats(void) {
+ 
+   }
+ 
++  avg_msg_sent =(double)((messages_sent_total-last_messages_sent_total)*1000.0)/(cur_ms-last_ms);
++  last_messages_sent_total=messages_sent_total;
++
+   last_ms = cur_ms;
+   last_execs = total_execs;
+ 
+@@ -5093,6 +5101,9 @@ static void show_stats(void) {
+ 
+   SAYF (bSTG bV bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
+ 
++  sprintf(tmp, "%-.2f msg/sec", avg_msg_sent);
++  SAYF(bV bSTOP "   msg speed : " "%s" "%-21s " bSTG bV bSTOP "%-40s" bSTG bV "\n", avg_msg_sent>avg_exec*10?cLGN:cRST, tmp, "");
++
+   /* Aaaalmost there... hold on! */
+ 
+   SAYF(bVR bH cCYA bSTOP " fuzzing strategy yields " bSTG bH10 bH bHT bH10
