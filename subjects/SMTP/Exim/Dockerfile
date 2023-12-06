@@ -46,7 +46,7 @@ RUN git clone https://github.com/veltavid/HNPFuzzer.git && \
     cd llvm_mode && make $MAKE_OPT
 
 ENV WORKDIR="/home/ubuntu/experiments"
-env HNPFUZZER="/home/ubuntu/HNPFuzzer"
+ENV HNPFUZZER="/home/ubuntu/HNPFuzzer"
 ENV PATH="${PATH}:${HNPFUZZER}:/home/ubuntu/.local/bin:${WORKDIR}"
 ENV AFL_PATH="${HNPFUZZER}"
 ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
